@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 // import 'package:http/http.dart' as http; // 不需要 HTTP 了
-import 'pose_painter.dart'; 
+import 'pose_painter.dart';
 import 'package:web_socket_channel/web_socket_channel.dart'; // 引入 WebSocket 套件
 
 List<CameraDescription> cameras = [];
@@ -51,7 +51,7 @@ class _PoseDetectionCameraPageState extends State<PoseDetectionCameraPage> {
       _channel!.stream.listen((message) {
         try {
           var data = jsonDecode(message);
-          
+
           if (mounted) {
             setState(() {
               // 更新辨識結果文字
@@ -113,12 +113,22 @@ class _PoseDetectionCameraPageState extends State<PoseDetectionCameraPage> {
     }
   }
 
+  // 🔥 新增一個變數來控制是否正在處理中
+  bool _isProcessing = false;
+
   // 🔥 2. 自動抓圖邏輯 (使用 Timer 替代原本的遞迴)
   void _startAutoCapture() {
     // 每 60ms 執行一次 (約 15-16 FPS)
-    _timer = Timer.periodic(const Duration(milliseconds: 60), (timer) async {
+    _timer = Timer.periodic(const Duration(milliseconds: 150), (timer) async {
       // 安全檢查：相機未初始化或正在拍照時不執行
-      if (!_isCameraInitialized || _controller == null || _controller!.value.isTakingPicture) return;
+      if (!_isCameraInitialized ||
+          _controller == null ||
+          _controller!.value.isTakingPicture) return;
+
+      // 🔥 2. 關鍵修正：如果上一張還在忙，這一次就直接「跳過」，不要讓任務堆積！
+      if (_isProcessing) return;
+
+      _isProcessing = true; // 🔒 上鎖
 
       try {
         // 拍照
@@ -132,7 +142,6 @@ class _PoseDetectionCameraPageState extends State<PoseDetectionCameraPage> {
 
         // 刪除暫存檔 (避免手機儲存空間爆炸)
         await File(imageFile.path).delete();
-
       } catch (e) {
         print("抓圖或傳送失敗: $e");
         // 這裡可以選擇不處理錯誤，因為即時串流掉一兩幀沒關係
@@ -151,7 +160,7 @@ class _PoseDetectionCameraPageState extends State<PoseDetectionCameraPage> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    
+
     // 判斷是否連線中 (用來改變 UI 燈號顏色)
     bool isConnected = _channel != null && _channel!.closeCode == null;
 
@@ -182,7 +191,7 @@ class _PoseDetectionCameraPageState extends State<PoseDetectionCameraPage> {
                 ),
               ),
             ),
-          
+
           // 2. 骨架繪製層 (PosePainter)
           if (_isCameraInitialized && _controller != null)
             SizedBox.expand(
@@ -197,7 +206,7 @@ class _PoseDetectionCameraPageState extends State<PoseDetectionCameraPage> {
                 ),
               ),
             ),
-          
+
           // 3. 錯誤訊息層
           if (!_isCameraInitialized)
             Center(
@@ -206,7 +215,7 @@ class _PoseDetectionCameraPageState extends State<PoseDetectionCameraPage> {
                       style: const TextStyle(color: Colors.red))
                   : const CircularProgressIndicator(),
             ),
-          
+
           // 4. 右上角狀態指示燈
           Positioned(
             top: 60,
@@ -224,13 +233,13 @@ class _PoseDetectionCameraPageState extends State<PoseDetectionCameraPage> {
                       color: isConnected ? Colors.green : Colors.grey,
                       size: 12),
                   const SizedBox(width: 8),
-                  Text(isConnected ? "WS 連線中" : "離線", 
-                       style: const TextStyle(color: Colors.white)),
+                  Text(isConnected ? "WS 連線中" : "離線",
+                      style: const TextStyle(color: Colors.white)),
                 ],
               ),
             ),
           ),
-          
+
           // 5. 底部結果顯示層
           Positioned(
             bottom: 40,
