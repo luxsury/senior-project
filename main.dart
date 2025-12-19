@@ -1,5 +1,4 @@
 import 'dart:async'; 
-import 'dart:io'; // 雖然這裡沒用到，但保留無妨
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart'; 
 
